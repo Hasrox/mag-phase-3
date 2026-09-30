@@ -170,6 +170,7 @@ def main() -> None:
     from mag.catalog import seed_catalog
     from mag.config import load_config
     from mag.db import connect, init_db
+    from mag.inbox import absorb
     from mag.paths import DATA
     from mag.serve import abandon_stale
 
@@ -177,6 +178,10 @@ def main() -> None:
     conn = connect()
     init_db(conn)
     seed_catalog(conn)
+    added = absorb(conn, cfg)
+    print(added.line())
+    for item in added.rejected:
+        print(f"skip {item}")
     abandon_stale(conn, cfg.pool.abandon_minutes)
     play = PlaySession(conn, cfg, DATA / "profiles", RENDER_CACHE)
     demo = build_demo(play)
