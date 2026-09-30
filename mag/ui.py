@@ -7,6 +7,7 @@ attribution chips, topic, Reset topic, Reset profile. Reset profile asks twice.
 from __future__ import annotations
 
 import os
+import threading
 from pathlib import Path
 
 os.environ["GRADIO_ANALYTICS_ENABLED"] = "False"
@@ -49,6 +50,7 @@ class PlaySession:
         self.topic: str | None = None
         self.impression_id: int | None = None
         self.confirm_reset = False
+        self._db_lock = threading.Lock()
         from mag.serve import active_profile, open_session
 
         self.profile = active_profile(conn, cfg)
@@ -68,6 +70,10 @@ class PlaySession:
         return len(pool_images(self.conn, self.topic))
 
     def generate(self):
+        with self._db_lock:
+            return self._generate()
+
+    def _generate(self):
         self.confirm_reset = False
         result = score_and_pick(
             self.conn, self.cfg,
@@ -84,6 +90,10 @@ class PlaySession:
         return result.render_path, result.sound_path or None, self._status()
 
     def on_rate(self, stars: int, chips: list[str] | None):
+        with self._db_lock:
+            return self._on_rate(stars, chips)
+
+    def _on_rate(self, stars: int, chips: list[str] | None):
         self.confirm_reset = False
         if self.impression_id is None:
             return self._status("nothing to rate")
@@ -92,6 +102,10 @@ class PlaySession:
         return self._status(f"rated {stars}")
 
     def on_skip(self):
+        with self._db_lock:
+            return self._on_skip()
+
+    def _on_skip(self):
         self.confirm_reset = False
         if self.impression_id is None:
             return self._status("nothing to skip")
@@ -100,6 +114,10 @@ class PlaySession:
         return self._status("skipped")
 
     def on_flag(self, kind: str):
+        with self._db_lock:
+            return self._on_flag(kind)
+
+    def _on_flag(self, kind: str):
         self.confirm_reset = False
         if self.impression_id is None or kind not in FLAG_KINDS:
             return self._status("nothing to flag")
@@ -108,6 +126,10 @@ class PlaySession:
         return self._status(f"flagged {kind}")
 
     def on_topic(self, topic: str | None):
+        with self._db_lock:
+            return self._on_topic(topic)
+
+    def _on_topic(self, topic: str | None):
         self.confirm_reset = False
         self.topic = topic or None
         from mag.serve import open_session
@@ -116,12 +138,20 @@ class PlaySession:
         return self._status()
 
     def on_reset_topic(self):
+        with self._db_lock:
+            return self._on_reset_topic()
+
+    def _on_reset_topic(self):
         self.confirm_reset = False
         self.topic = None
         self.session = reset_topic(self.conn, int(self.profile["id"]))
         return self._status("topic cleared")
 
     def on_reset_profile(self):
+        with self._db_lock:
+            return self._on_reset_profile()
+
+    def _on_reset_profile(self):
         if not self.confirm_reset:
             self.confirm_reset = True
             return self._status("click Reset profile again")
