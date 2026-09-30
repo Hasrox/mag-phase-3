@@ -39,6 +39,15 @@ def _empty(reason: str, pool: int, candidates: int) -> tuple[None, None, str]:
     return None, None, f"empty pool: {reason}; images={pool}; compositions={candidates}"
 
 
+def _sound_note(path: str) -> str:
+    if not path:
+        return "silence (no file; this draw has no sound)"
+    file = Path(path)
+    if not file.is_file():
+        return f"missing audio file {file.name}"
+    return f"audio {file.name}"
+
+
 class PlaySession:
     """In-process session. Generate does not open a socket."""
 
@@ -85,9 +94,24 @@ class PlaySession:
         if result.impression_id is None:
             self.impression_id = None
             image, audio, text = _empty(result.reason, result.pool_images, result.candidate_count)
+            from mag.log import get_log
+
+            get_log().info(
+                "serve empty reason=%s pool=%s candidates=%s",
+                result.reason, result.pool_images, result.candidate_count,
+            )
             return image, audio, self._status(text)
         self.impression_id = result.impression_id
-        return result.render_path, result.sound_path or None, self._status()
+        sound = result.sound_path or ""
+        sound_note = _sound_note(sound)
+        from mag.log import get_log
+
+        get_log().info(
+            "serve impression=%s policy=%s image=%s template=%s text=%r sound=%s render=%s",
+            result.impression_id, result.policy, result.image_id, result.template_id,
+            result.text, sound_note, result.render_path,
+        )
+        return result.render_path, sound or None, self._status(f"template caption | {sound_note}")
 
     def on_rate(self, stars: int, chips: list[str] | None):
         with self._db_lock:
@@ -97,6 +121,9 @@ class PlaySession:
         self.confirm_reset = False
         if self.impression_id is None:
             return self._status("nothing to rate")
+        from mag.log import get_log
+
+        get_log().info("rate impression=%s stars=%s chips=%s", self.impression_id, stars, chips or [])
         rate(self.conn, self.cfg, self.impression_id, stars, chips or [])
         self.impression_id = None
         return self._status(f"rated {stars}")
@@ -109,6 +136,9 @@ class PlaySession:
         self.confirm_reset = False
         if self.impression_id is None:
             return self._status("nothing to skip")
+        from mag.log import get_log
+
+        get_log().info("skip impression=%s", self.impression_id)
         skip(self.conn, self.cfg, self.impression_id)
         self.impression_id = None
         return self._status("skipped")
@@ -121,6 +151,9 @@ class PlaySession:
         self.confirm_reset = False
         if self.impression_id is None or kind not in FLAG_KINDS:
             return self._status("nothing to flag")
+        from mag.log import get_log
+
+        get_log().info("flag impression=%s kind=%s", self.impression_id, kind)
         flag(self.conn, self.impression_id, kind)
         self.impression_id = None
         return self._status(f"flagged {kind}")
@@ -209,7 +242,11 @@ def main() -> None:
     init_db(conn)
     seed_catalog(conn)
     added = absorb(conn, cfg)
+    from mag.log import get_log
+
+    get_log().info("ui start %s", added.line())
     print(added.line())
+    print("log=data/mag.log")
     for item in added.rejected:
         print(f"skip {item}")
     abandon_stale(conn, cfg.pool.abandon_minutes)
