@@ -1,0 +1,9 @@
+MAG safety rubric 1.1
+
+The tagger judges the image, not the joke the template might later make.
+reject: sexual content involving minors; sexual violence; graphic real-world gore.
+review: identifiable private individuals; slur-bearing text; ambiguous cases.
+ok: everything else, including crude humor, fictional violence, and toilet humor.
+
+Content that is illegal to possess is deleted from the store, not merely excluded.
+The operator may extend this file before the first tag run. The file hash is stored on the tag run. Changing it after seeing gold scores voids the run.

@@ -1,0 +1,24 @@
+MAG model card — operator input, blocks Phase 2 only
+
+name:
+source:
+license:
+quant:
+parameter_count:
+mmproj:
+llama_cpp_commit:
+
+Gold thresholds, fixed before the first tag run (section 5.3):
+  emotion accuracy                         >= 0.70
+  family accuracy                          >= 0.80
+  intensity within one level               >= 0.85
+  topics micro-F1                          >= 0.70
+  subject and action usable                >= 0.80
+  safety missed rejects                    = 0
+  safety false-reject on gold ok           <= 0.10
+  determinism, second gold run             >= 0.95 of fields
+
+S-4 passed:
+S-5 passed:
+S-2 verdict:
+notes:
