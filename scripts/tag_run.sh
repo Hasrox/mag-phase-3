@@ -42,4 +42,7 @@ bash "$ROOT/scripts/gpu_gate.sh" --model "$MODEL" --mmproj "$MMPROJ" \
   --n-gpu-layers all --bind "$HOST" --host "$HOST" \
   --fixture-log "$LOG" --mem-before "$MEM_BEFORE" --mem-after "$MEM_AFTER" \
   --tps "${MIN_TPS:-15}" --pid "$PID" --commit "${LLAMA_COMMIT:-unpinned}"
-echo "gate passed; tagger would run here. Stopping server."
+RECORD="$(ls -1t "$ROOT/runtime/gates/"*.json | head -1)"
+echo "gate passed; tagging with $RECORD"
+python3 "$ROOT/scripts/tag_batch.py" --model "$MODEL" --mmproj "$MMPROJ" --gate-record "$RECORD" \
+  --rubric "$ROOT/config/safety_rubric.txt"
