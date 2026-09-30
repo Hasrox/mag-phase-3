@@ -1,0 +1,15 @@
+# Phase 4 construction. Not an exit claim.
+# Entry pin is mag-phase-3 main. Ranking body is the uniform holdout draw.
+# Phase 5 replaces pick_candidate / predict, not the UI.
+
+locked = false
+locked_at = ""
+entry_pin = "aacc33aca183e5d73aac8cd43d789b536c1d46b3"
+source = "https://github.com/Hasrox/mag-phase-3"
+policy_body = "holdout_draw"
+weight_update = false
+http_calls = 0
+ui_host = "127.0.0.1"
+ui_port = 7860
+s1_attempted = false
+note = "Ten manual generations and the S-1 record are operator exits. Failure of S-1 does not block Phase 5."

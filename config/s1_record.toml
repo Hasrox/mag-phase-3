@@ -1,0 +1,7 @@
+# S-1 smoke. Not attempted. Failure does not block Phase 5.
+attempted = false
+passed = false
+rated_3_or_higher = 0
+rated_4_or_higher = 0
+bad_flags = 0
+stars = []
