@@ -12,6 +12,7 @@ import sqlite3
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
+from datetime import datetime, timezone
 
 from mag.composer import (
     Caption,
@@ -85,7 +86,7 @@ def cooldown_k(pool_size: int, cap: int) -> int:
 
 
 def _now() -> str:
-    return time.strftime("%Y-%m-%dT%H:%M:%fZ", time.gmtime())
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
 
 def abandon_stale(conn: sqlite3.Connection, minutes: int) -> int:
