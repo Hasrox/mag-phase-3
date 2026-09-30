@@ -40,11 +40,11 @@ def _pick_font(draw, text: str, cfg: RenderCfg, width: int):
 
 def _draw_bar(image, text: str, cfg: RenderCfg):
     base = image.convert("RGB")
-    canvas = Image.new("RGB", (base.width, base.height + cfg.bar_height), (18, 18, 18))
+    canvas = Image.new("RGB", (base.width, base.height + cfg.bar_height), (255, 255, 255))
     canvas.paste(base, (0, cfg.bar_height))
     draw = ImageDraw.Draw(canvas)
     font = _pick_font(draw, text, cfg, canvas.width)
-    draw.multiline_text((cfg.margin, cfg.margin), text, font=font, fill=(240, 240, 240), spacing=4)
+    draw.multiline_text((cfg.margin, cfg.margin), text, font=font, fill=(0, 0, 0), spacing=4)
     return canvas
 
 
