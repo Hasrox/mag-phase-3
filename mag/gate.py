@@ -17,7 +17,8 @@ PROJECTOR = re.compile(r"(mmproj|clip|projector).{0,80}CUDA", re.IGNORECASE)
 
 
 class GateRecord(BaseModel):
-    model_config = ConfigDict(extra="ignore")
+    # model_sha256 and mmproj_sha256 shadow pydantic's model_ namespace.
+    model_config = ConfigDict(extra="ignore", protected_namespaces=())
     pass_: bool
     layer_string: str
     gpu_name: str

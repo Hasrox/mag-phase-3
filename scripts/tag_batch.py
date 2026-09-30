@@ -46,9 +46,12 @@ def main() -> None:
         vocab_version="1.1",
         gate_ref=str(args.gate_record),
     )
+    # 'tagged' is included so an interrupted run resumes: write_model_tags
+    # marks each row tagged as it goes, so a re-run picks up where it stopped
+    # instead of re-tagging the whole store.
     rows = conn.execute(
         """SELECT id, path FROM assets
-           WHERE kind = 'image' AND state = 'new' AND is_gold = 0
+           WHERE kind = 'image' AND state IN ('new', 'tagged') AND is_gold = 0
            ORDER BY id"""
     ).fetchall()
     if args.limit:
@@ -56,17 +59,19 @@ def main() -> None:
     rubric = args.rubric.read_text()
     tagged = left = 0
     root = Path(__file__).resolve().parents[1]
-    for row in rows:
+    for index, row in enumerate(rows, start=1):
         attempts = tag_image(
             root / row["path"], cfg, args.gate_record, args.model, args.mmproj, rubric,
         )
         payload = next((item.payload for item in attempts if item.payload is not None), None)
         if payload is None:
             left += 1
+            print(f"[{index}/{len(rows)}] id={row['id']} UNPARSED, left untagged")
             continue
         conf = next(item.conf for item in attempts if item.payload is not None)
         write_model_tags(conn, int(row["id"]), payload, run_id, conf)
         tagged += 1
+        print(f"[{index}/{len(rows)}] id={row['id']} tagged conf={conf}")
     print(f"run={run_id} tagged={tagged} untagged={left} accepted=0")
 
 

@@ -75,6 +75,9 @@ def write_model_tags(
             int(payload.text_in_image), int(payload.profanity_in_image), conf, asset_id,
         ),
     )
+    # Mark the row tagged so a batch run resumes instead of re-tagging it.
+    # Promotion to active still waits for an accepted run.
+    conn.execute("UPDATE assets SET state = 'tagged' WHERE id = ?", (asset_id,))
     conn.commit()
 
 

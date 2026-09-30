@@ -78,14 +78,17 @@ def preflight_negative_cases() -> list[tuple[str, bool]]:
             no_mmproj_offload=False, cpu_build=True, model_ok=True)),
         ("vram_under_16gb", vram_failures(15.0 * 1024, 16.0)),
         ("decode_below_floor", decode_failures(9.0, 15.0)),
+        ("vram_12gb_card", vram_failures(12 * 1024, 16.0)),
         ("clean_preflight", preflight_failures(
             bind="127.0.0.1", host="127.0.0.1", n_gpu_layers="all",
             no_mmproj_offload=False, cpu_build=False, model_ok=True)),
         ("vram_exactly_16gb", vram_failures(16.0 * 1024, 16.0)),
+        # A card sold as 16 GB reports 16376 MiB. Rejecting it would reject the
+        # exact hardware the spec targets.
+        ("vram_16gb_card_reported_as_mib", vram_failures(16376, 16.0)),
         ("decode_at_floor", decode_failures(15.0, 15.0)),
     ]
     return [(name, bool(failures)) for name, failures in rejected]
-
 
 def must_pass_cases() -> list[tuple[str, bool]]:
     """The clean cases. Each must be ACCEPTED, or the gate is over-strict."""
@@ -93,4 +96,6 @@ def must_pass_cases() -> list[tuple[str, bool]]:
             if name in MUST_PASS]
 
 
-MUST_PASS = {"clean_preflight", "vram_exactly_16gb", "decode_at_floor"}
+MUST_PASS = {
+    "clean_preflight", "vram_exactly_16gb", "vram_16gb_card_reported_as_mib", "decode_at_floor",
+}

@@ -30,7 +30,8 @@ HEALTH = re.compile(r"health ok|server is listening", re.IGNORECASE)
 
 
 class GateOptions(BaseModel):
-    model_config = ConfigDict(extra="ignore")
+    # model_sha256 and mmproj_sha256 shadow pydantic's model_ namespace.
+    model_config = ConfigDict(extra="ignore", protected_namespaces=())
     model: Path
     mmproj: Path
     log: Path
@@ -54,7 +55,7 @@ class GateOptions(BaseModel):
 
 
 class GateVerdict(BaseModel):
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="ignore", protected_namespaces=())
     ok: bool
     checks: dict[str, bool]
     failures: list[str]
@@ -90,8 +91,17 @@ def preflight_failures(
 
 
 def vram_failures(total_mib: float, need_gb: float) -> list[str]:
-    if total_mib / 1024.0 < need_gb:
-        return [f"VRAM {total_mib / 1024.0:.1f} GB is below {need_gb} GB"]
+    """Reject a GPU below the floor.
+
+    nvidia-smi reports MiB. A card sold as 16 GB reports 16376 MiB, which is
+    15.99 GiB, so a strict comparison would reject the exact hardware the spec
+    targets. The floor is compared with a 0.5 percent tolerance, which is far
+    tighter than the gap between real card sizes.
+    """
+    gib = total_mib / 1024.0
+    floor = need_gb * 0.995
+    if gib < floor:
+        return [f"VRAM {gib:.2f} GB is below {need_gb} GB"]
     return []
 
 
