@@ -1,0 +1,14 @@
+# Operator lock. Phase 3 may start locally for debug.
+# This does not claim the model gate, S-4, or S-5.
+
+locked = true
+locked_at = "2026-09-30"
+note = "Operator lock. Seed is 300 jpg and 40 mp3, local collection. License notes are not a gate. Sounds accepted as-is. Playback cap 8s. No trim."
+seed_images = 300
+seed_sounds = 40
+sound_reject_on_length = false
+play_cap_s = 8.0
+model_gate_claimed = false
+s4_claimed = false
+s5_claimed = false
+phase3 = "skeleton. Debug entry only. Renderer must accept GIF."

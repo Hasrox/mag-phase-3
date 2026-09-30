@@ -57,7 +57,11 @@ star_5 = 1.00
 
 [sound]
 target_lufs = -16.0
-max_duration_s = 5.0
+# Operator override 2026-09-30. Do not trim. Do not reject on length.
+# Playback uses the first play_cap_s seconds. The file is stored whole.
+max_duration_s = 8.0
+play_cap_s = 8.0
+accept_over_cap = true
 warn_duration_s = 2.5
 lufs_tolerance = 1.0
 onset_db = -40.0
