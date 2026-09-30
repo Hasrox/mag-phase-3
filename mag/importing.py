@@ -207,7 +207,8 @@ def import_sound(
     if not src.is_file():
         raise ImportRejected(f"sound file missing: {src}")
     duration_ms = _probe_duration_ms(src)
-    if duration_ms > cfg.sound.max_duration_s * 1000:
+    # accept_over_cap stores the whole file. Playback stops at play_cap_s.
+    if not cfg.sound.accept_over_cap and duration_ms > cfg.sound.max_duration_s * 1000:
         raise ImportRejected(
             f"sound is {duration_ms} ms; hard limit is {cfg.sound.max_duration_s} s"
         )
@@ -227,10 +228,13 @@ def import_sound(
     except Exception:
         norm.unlink(missing_ok=True)
         raise
-    if duration_ms >= 1000 and abs(loudness - cfg.sound.target_lufs) > cfg.sound.lufs_tolerance:
-        norm.unlink(missing_ok=True)
-        raise ImportRejected(
-            f"normalized loudness {loudness:.2f} LUFS is outside "
+    loud_warn = (
+        duration_ms >= 1000
+        and abs(loudness - cfg.sound.target_lufs) > cfg.sound.lufs_tolerance
+    )
+    if loud_warn:
+        print(
+            f"warn {src.name}: normalized loudness {loudness:.2f} LUFS is outside "
             f"{cfg.sound.lufs_tolerance} LU of {cfg.sound.target_lufs}"
         )
     cur = conn.execute(
@@ -248,7 +252,7 @@ def import_sound(
             onset,
             loudness,
             _rel(norm, assets),
-            int(duration_ms > cfg.sound.warn_duration_s * 1000),
+            int(duration_ms > cfg.sound.warn_duration_s * 1000 or loud_warn),
         ),
     )
     _write_tag(conn, asset_id, "sound_class", manifest["class"], "import")
