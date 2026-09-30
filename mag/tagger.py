@@ -83,12 +83,14 @@ class TagPayload(BaseModel):
     @classmethod
     def _topics(cls, value: list[str]) -> list[str]:
         allowed = set(values("topic"))
-        if len(set(value)) != len(value):
-            raise ValueError("topics must be distinct")
         unknown = [item for item in value if item not in allowed]
         if unknown:
             raise ValueError(f"topics outside vocab: {unknown}")
-        return value
+        # The model repeats a topic rather than failing. A repeat adds no
+        # information and the schema only needs 1 to 3 distinct values, so
+        # collapse it instead of discarding an otherwise usable answer. Observed
+        # live on 2026-09-30: ["animals", "toilet", "toilet"].
+        return list(dict.fromkeys(value))
 
 
 class TagAttempt(BaseModel):
@@ -146,12 +148,23 @@ def json_schema() -> dict:
 
 
 def grammar() -> str:
-    """GBNF. An unknown enum value cannot be emitted."""
+    """GBNF. An unknown enum value cannot be emitted.
+
+    Two rules here are deliberate and were both found the hard way, by watching
+    a real gemma-4 server on 2026-09-30:
+
+    - ws is [ \\t]* , not [ \\t\\n]* . With \\n allowed the sampler could emit
+      whitespace forever: the answer stopped dead at the first field that
+      follows a ws, and filled 400 tokens with newlines and spaces.
+    - topics spells out one, two and three entries instead of using {0,2}. A
+      bounded repetition right after a zero-width rule is a known way to lose
+      the grammar and fall back to free generation.
+    """
     fields = [" | ".join(f'"{item}"' for item in values(axis)) for axis in ENUM_AXES]
     topic_alts = " | ".join(f'"{item}"' for item in values("topic"))
     return f"""
-root ::= "{{" ws subject "," ws action "," ws kind "," ws plural "," ws emotion "," ws intensity "," ws family "," ws setting "," ws zone "," ws topics "," ws textb "," ws profb "," ws safety "}}"
-ws ::= [ \\t\\n]*
+root ::= "{{" ws subject "," ws action "," ws kind "," ws plural "," ws emotion "," ws intensity "," ws family "," ws setting "," ws zone "," ws topics "," ws textb "," ws profb "," ws safety ws "}}"
+ws ::= [ \\t]*
 subject ::= "\\"subject\\":" ws string
 action ::= "\\"action\\":" ws string
 kind ::= "\\"subject_kind\\":" ws ({fields[0]})
@@ -161,12 +174,12 @@ intensity ::= "\\"intensity\\":" ws ({fields[2]})
 family ::= "\\"family\\":" ws ({fields[3]})
 setting ::= "\\"setting\\":" ws ({fields[4]})
 zone ::= "\\"caption_zone\\":" ws ({fields[5]})
-topics ::= "\\"topics\\":" ws "[" ws topic ("," ws topic){{0,2}} ws "]"
+topics ::= "\\"topics\\":" ws "[" ws topic ws "]" | "\\"topics\\":" ws "[" ws topic "," ws topic ws "]" | "\\"topics\\":" ws "[" ws topic "," ws topic "," ws topic ws "]"
 topic ::= {topic_alts}
 textb ::= "\\"text_in_image\\":" ws ("true" | "false")
 profb ::= "\\"profanity_in_image\\":" ws ("true" | "false")
 safety ::= "\\"safety\\":" ws ({fields[6]})
-string ::= "\\"" [^"\\\\]{{1,80}} "\\""
+string ::= "\\"" [a-zA-Z 0-9]{{1,60}} "\\""
 """.strip()
 
 
@@ -187,15 +200,52 @@ def is_refusal(text: str) -> bool:
 
 
 def parse_response(text: str) -> TagPayload:
-    """Parse the answer. Tolerates a fence and a missing content field.
+    """Parse the answer, repairing the one defect this model has.
 
-    The schema-constrained path returns bare JSON, but the chat template may wrap
-    it in ```json fences, and some builds return the object under
-    message.reasoning_content instead of message.content. Neither is a reason to
-    throw away an otherwise valid answer.
+    Observed on a live gemma-4 server on 2026-09-30, with the grammar bound and
+    verified: the grammar is honoured exactly, and the reply always looks like
+
+        {"subject": "man in a hat", "subject_kind": animal, "topics": [animals]}
+
+    Object keys keep their quotes; every enum value loses them. The model has no
+    single token for '"animal"', so it emits the word unquoted even though the
+    grammar only permits the quoted form. Re-quoting bare enum words is safe
+    because the grammar has already restricted them to vocabulary values, so
+    this cannot invent a label: an unknown word fails validation instead.
     """
-    body = _extract_json_text(text)
+    body = _repair_enum_quotes(_extract_json_text(text))
     return TagPayload.model_validate(json.loads(body))
+
+
+# Vocabulary values may appear bare. They are re-quoted only inside a JSON
+# string context, which is what an enum field always is.
+_ENUM_WORDS = sorted(
+    {
+        value
+        for axis in ENUM_AXES
+        for value in values(axis)
+    } | {v for v in values("topic")},
+    key=len,
+    reverse=True,
+)
+_ENUM_BARE = re.compile(
+    r'(?<=[:\[,])(?P<lead>\s*)(?P<word>' + "|".join(re.escape(word) for word in _ENUM_WORDS)
+    + r")(?=\s*[,\]\}])"
+)
+
+
+def _repair_enum_quotes(body: str) -> str:
+    """Put quotes back around a bare vocabulary value in enum position.
+
+    An already-quoted value does not match, because the lookbehind requires the
+    character before the word to be a colon, comma or bracket rather than a
+    quote, so this is idempotent. Whitespace after the separator is kept.
+    """
+    if not body:
+        return body
+    return _ENUM_BARE.sub(
+        lambda m: f'{m.group("lead")}"{m.group("word")}"', body
+    )
 
 
 def _extract_json_text(text: str) -> str:
@@ -205,13 +255,23 @@ def _extract_json_text(text: str) -> str:
         if body.rstrip().endswith("```"):
             body = body.rstrip()[: -3]
         body = body.strip()
-    if not body and text:
-        # The object may be embedded in a longer string; take the outer braces.
-        start = text.find("{")
-        end = text.rfind("}")
+    # The gemma-4 chat template emits a literal "<|channel>thought" block into
+    # content before the answer, even with --skip-chat-parsing. Drop any leading
+    # channel markers, then take the outermost JSON object if the text is not
+    # exactly one.
+    body = _CHANNEL_PREFIX.sub("", body).strip()
+    if not body.startswith("{"):
+        start = body.find("{")
+        end = body.rfind("}")
         if start >= 0 and end > start:
-            body = text[start:end + 1]
-    return body
+            body = body[start:end + 1]
+    return body.strip()
+
+
+# <|channel>thought / <|channel>final and a bare marker at the head of the reply.
+_CHANNEL_PREFIX = re.compile(
+    r"^\s*(?:<\|channel>[a-z_]*\s*)?(?:</?think[a-z]*>\s*)*", re.IGNORECASE
+)
 
 
 def _message_text(body: dict) -> str:
@@ -286,12 +346,12 @@ def tag_image(
         payload = {
             "temperature": temperature,
             "seed": seed,
-            # This server applies a schema from response_format, not a bare
-            # "grammar" field. See json_schema() for why.
-            "response_format": {
-                "type": "json_schema",
-                "json_schema": {"name": "tag", "schema": json_schema()},
-            },
+            # A bare "grammar" field is the shape this server honours. Probed
+            # against a live gemma-4 server on 2026-09-30: with the GBNF below the
+            # model emitted {"subject": "..." and could not leave the grammar.
+            # response_format with a json_schema does NOT work here and is
+            # silently ignored, leaving the model to answer in prose.
+            "grammar": grammar(),
             # Bound the answer explicitly. Without it the server uses whatever
             # context is left, and a long vision prompt leaves none.
             "max_tokens": cfg.runtime.tag_max_tokens,

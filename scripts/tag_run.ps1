@@ -87,6 +87,9 @@ $Proc = Start-Process -FilePath $Server -PassThru -NoNewWindow -RedirectStandard
     # The flag takes one directory, so the media root is assets/ and paths are
     # resolved relative to it. Nothing above assets/ is reachable.
     "--media-path", (Join-Path $Root "assets"),
+    # Keeps the answer in message.content. Without it this chat template returns
+    # the model's scratchpad there instead, and the tagger reads an empty string.
+    "--skip-chat-parsing",
     "-lv", "4"
 )
 

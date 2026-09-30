@@ -66,13 +66,14 @@ def main() -> None:
         payload = next((item.payload for item in attempts if item.payload is not None), None)
         if payload is None:
             left += 1
-            # Print why, or a whole batch is silently wasted. The first failure
-            # of a run is dumped in full.
+            # Print why, or a whole batch is silently wasted. The first few
+            # failures of a run are dumped in full.
             reason = next((item.error for item in attempts if item.error), "no error captured")
             print(f"[{index}/{len(rows)}] id={row['id']} UNPARSED: {reason}")
-            if left == 1:
+            if left <= 3:
                 for item in attempts:
-                    print(f"  attempt temp={item.temperature} seed={item.seed} raw={item.raw[:400]!r}")
+                    print(f"  attempt temp={item.temperature} seed={item.seed} error={item.error}")
+                    print(f"  raw={item.raw[:800]!r}")
             continue
         conf = next(item.conf for item in attempts if item.payload is not None)
         write_model_tags(conn, int(row["id"]), payload, run_id, conf)
