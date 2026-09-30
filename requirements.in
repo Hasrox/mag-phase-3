@@ -1,4 +1,6 @@
 gradio==4.44.1
+# Gradio 4.44 imports HfFolder. huggingface_hub 1.x removed it.
+huggingface_hub<1
 httpx==0.27.2
 pydantic==2.9.2
 pillow==10.4.0
