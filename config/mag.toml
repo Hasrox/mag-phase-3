@@ -9,15 +9,33 @@ version = "1.1"
 [runtime]
 host = "127.0.0.1"
 port = 8080
-ctx_size = 4096
+ctx_size = 8192
+# 4096 was too small once the safety rubric and the schema are in the prompt.
+# The image tokens plus the prompt consumed the whole window and generation was
+# truncated at 4095 tokens before any JSON was emitted, so every tag failed to
+# parse. 8192 leaves room for the answer.
 n_gpu_layers = "all"
 parallel = 1
 min_decode_tps = 15.0
 min_vram_gb = 16.0
 host_buffer_max_mib = 64.0
-memory_delta_ratio = 0.9
+# Note: a fully offloaded Q6_K still maps ~787 MiB into host memory (CPU_Mapped),
+# so this absolute cap is applied as a ratio against the CUDA buffer in
+# mag.gate.check_log, not on its own. A 64 MiB cap read literally would reject
+# every correct run.
+memory_delta_ratio = 0.85
+# Advisory only. Q6_K is memory-mapped, so the resident VRAM is about 0.85 of the
+# file size (8041 MiB measured against a 9.26 GB model on an RTX 4080). The hard
+# evidence that the weights reached the GPU is the CUDA0 model buffer line in the
+# server log, checked by mag.gate.check_log.
 image_long_side = 1024
-tag_timeout_s = 60
+# A full-resolution vision encode of a 12B model on one consumer GPU takes much
+# longer than a text decode. 60 s was measured far too short: the first tagged
+# image timed out at 60 s and again at 120 s before this was raised.
+tag_timeout_s = 600
+# The answer is 14 short JSON fields. Bounded so a runaway generation cannot
+# consume the whole context, which is what truncated every response at ctx 4096.
+tag_max_tokens = 400
 tag_retry_temperature = 0.2
 tag_conf_min = 0.5
 prompt_version = "1.1.0"

@@ -4,48 +4,86 @@ Every case here must be REJECTED. They exist so a CUDA gate cannot silently
 pass on a partial offload, a CPU KV cache, a host model buffer, a projector on
 the CPU, a public bind, a small GPU, a slow decode, or a missing offload line.
 scripts/gpu_gate.sh is the POSIX equivalent and writes the same record shape.
+
+The PASS_LOG below is a real llama-server -lv 4 capture from an RTX 4080 with
+gemma-4-12B-it-uncensored-heretic.Q6_K, trimmed to the lines the gate reads.
+The strings are what this build actually prints. An earlier version of this file
+used invented strings and passed a log no real server produces.
 """
 
 from __future__ import annotations
 
-from mag.gate import check_log
+from mag.gate import HOST_BUFFER_MAX_MIB, check_log
 
+# Verbatim from runtime/last-server.log.err of a real -lv 4 run.
 PASS_LOG = """\
-ggml_cuda_init: found 1 CUDA devices:
-load_tensors: offloaded 48/48 layers to GPU
-load_tensors: CPU KV buffer size = 512.00 MiB
-clip_model: mmproj (projector) loaded on CUDA
-main: server is listening on http://127.0.0.1:8080
+common_param: device_info:
+common_init_: fitting params to device memory ...
+common_params_fit_impl: projected to use 9988 MiB of device memory vs. 15074 MiB of free device memory
+llama_prepare_model_devices: using device CUDA0 (NVIDIA GeForce RTX 4080) (0000:01:00.0) - 15074 MiB free
+srv    load_model: [mtmd] estimated worst-case memory usage of mmproj is 339.08 MiB (took 53.14 ms)
+load_tensors: offloading output layer to GPU
+load_tensors: offloading 47 repeating layers to GPU
+load_tensors: offloaded 49/49 layers to GPU
+load_tensors:   CPU_Mapped model buffer size =   787.50 MiB
+load_tensors:        CUDA0 model buffer size =  9317.65 MiB
+srv  llama_server: model loaded
+srv  llama_server: listening on http://127.0.0.1:8080
 """
 
-NO_OFFLOAD = PASS_LOG.replace("offloaded 48/48 layers to GPU", "offloaded 0/48 layers to GPU")
-PARTIAL = PASS_LOG.replace("offloaded 48/48 layers to GPU", "offloaded 10/48 layers to GPU")
+# What the operator's failed run looked like: no CUDA device line, no offload
+# line, no CUDA buffer. The model loaded entirely on the CPU in 16 seconds.
+CPU_ONLY_LOG = """\
+srv  llama_server: initializing ...
+cmn  common_param: verbosity = 3
+srv    load_model: loading model 'gemma-4-12B-it-uncensored-heretic.Q6_K.gguf'
+cmn          init: llama threadpool init, n_threads = 14
+srv    load_model: loaded multimodal model, 'gemma-4-12B-it-uncensored-heretic.mmproj-Q8_0.gguf'
+srv    load_model: initializing, n_slots = 1, n_ctx_slot = 4096
+srv  llama_server: model loaded
+srv  llama_server: listening on http://127.0.0.1:8080
+"""
+
+NO_OFFLOAD = PASS_LOG.replace("offloaded 49/49 layers to GPU", "offloaded 0/49 layers to GPU")
+PARTIAL = PASS_LOG.replace("offloaded 49/49 layers to GPU", "offloaded 10/49 layers to GPU")
 CPU_KV = PASS_LOG.replace(
-    "load_tensors: CPU KV buffer size = 512.00 MiB",
-    "llama_context: CPU KV buffer size = 512.00 MiB, CPU model buffer size = 900.00 MiB",
+    "load_tensors:   CPU_Mapped model buffer size =   787.50 MiB",
+    "llama_context: CPU KV buffer size = 512.00 MiB, CPU model buffer size = 9000.00 MiB",
 )
 HOST_BUFFER = PASS_LOG.replace(
-    "load_tensors: CPU KV buffer size = 512.00 MiB",
-    "load_tensors: host model buffer size = 900.00 MiB",
+    "load_tensors:   CPU_Mapped model buffer size =   787.50 MiB",
+    "load_tensors:   CPU model buffer size = 9317.65 MiB",
 )
-NO_PROJECTOR = PASS_LOG.replace(
-    "clip_model: mmproj (projector) loaded on CUDA",
-    "clip_model: mmproj (projector) loaded on CPU",
+NO_PROJECTOR = "\n".join(
+    line for line in PASS_LOG.splitlines() if "mmproj" not in line
+) + "\n"
+PROJECTOR_ON_CPU = PASS_LOG.replace(
+    "[mtmd] estimated worst-case memory usage of mmproj is 339.08 MiB",
+    "[mtmd] mmproj loaded on CPU, model buffer size = 339.08 MiB",
 )
-STRIPPED = "main: server is listening on http://127.0.0.1:8080\n"
-
-HOST_MAX_MIB = 64.0
+NO_CUDA_BUFFER = "\n".join(
+    line for line in PASS_LOG.splitlines() if "CUDA0 model buffer size" not in line
+) + "\n"
+DEVICE_IS_CPU = PASS_LOG.replace(
+    "llama_prepare_model_devices: using device CUDA0 (NVIDIA GeForce RTX 4080) (0000:01:00.0) - 15074 MiB free",
+    "llama_prepare_model_devices: using device CPU",
+)
+STRIPPED = "srv  llama_server: listening on http://127.0.0.1:8080\n"
 
 
 def negative_cases() -> list[tuple[str, bool]]:
     """Every case that MUST be rejected, log-based and preflight-based."""
     cases = [
-        ("partial_offload", check_log(PARTIAL, HOST_MAX_MIB)),
-        ("zero_offload", check_log(NO_OFFLOAD, HOST_MAX_MIB)),
-        ("cpu_kv_buffer", check_log(CPU_KV, HOST_MAX_MIB)),
-        ("host_model_buffer", check_log(HOST_BUFFER, HOST_MAX_MIB)),
-        ("projector_not_cuda", check_log(NO_PROJECTOR, HOST_MAX_MIB)),
-        ("offload_line_removed", check_log(STRIPPED, HOST_MAX_MIB)),
+        ("cpu_only_run", check_log(CPU_ONLY_LOG)),
+        ("zero_offload", check_log(NO_OFFLOAD)),
+        ("partial_offload", check_log(PARTIAL)),
+        ("cpu_kv_buffer", check_log(CPU_KV)),
+        ("host_model_buffer", check_log(HOST_BUFFER)),
+        ("projector_on_cpu", check_log(PROJECTOR_ON_CPU)),
+        ("no_projector_line", check_log(NO_PROJECTOR)),
+        ("no_cuda_buffer", check_log(NO_CUDA_BUFFER)),
+        ("device_is_cpu", check_log(DEVICE_IS_CPU)),
+        ("offload_line_removed", check_log(STRIPPED)),
     ]
     named = [(name, bool(failures)) for name, failures in cases]
     named += [
@@ -54,6 +92,11 @@ def negative_cases() -> list[tuple[str, bool]]:
         if name not in MUST_PASS
     ]
     return named
+
+
+def real_log_is_accepted() -> tuple[str, list[str]]:
+    """The real capture must pass. Returns (name, failures)."""
+    return ("real_lv4_log", check_log(PASS_LOG, HOST_BUFFER_MAX_MIB))
 
 
 def preflight_negative_cases() -> list[tuple[str, bool]]:

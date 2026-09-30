@@ -30,6 +30,8 @@ class Runtime(BaseModel):
     memory_delta_ratio: float
     image_long_side: int
     tag_timeout_s: int
+    # Bound on the JSON answer. The schema is 14 short fields, so 400 is ample.
+    tag_max_tokens: int = 400
     tag_retry_temperature: float
     tag_conf_min: float
     prompt_version: str

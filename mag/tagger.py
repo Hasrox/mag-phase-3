@@ -16,7 +16,12 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from mag.config import Config
 from mag.gate import assert_gate_alive
+from mag.paths import ASSETS
 from mag.vocab import values
+
+# Must match --media-path in scripts/tag_run.ps1. The server resolves media
+# relative to this root and rejects anything outside it.
+MEDIA_ROOT = ASSETS
 
 ENUM_AXES = (
     "subject_kind",
@@ -96,6 +101,50 @@ class TagAttempt(BaseModel):
     error: str = ""
 
 
+def json_schema() -> dict:
+    """JSON Schema for the tag payload, built from the vocabulary tables.
+
+    This build does not honour a bare "grammar" field on /v1/chat/completions.
+    server-schema.cpp gives json_schema precedence over grammar, and the chat
+    template for this model injects its own, so the GBNF below was silently
+    discarded: the model answered with unquoted enums and filler whitespace.
+    A JSON schema through response_format is what this server actually applies,
+    and the vocabularies still make an out-of-range enum impossible.
+    """
+    def enum(axis: str) -> dict:
+        return {"type": "string", "enum": values(axis)}
+
+    return {
+        "type": "object",
+        "properties": {
+            "subject": {"type": "string", "minLength": 1, "maxLength": 120},
+            "action": {"type": "string", "minLength": 1, "maxLength": 120},
+            "subject_kind": enum("subject_kind"),
+            "subject_plural": {"type": "boolean"},
+            "emotion": enum("emotion"),
+            "intensity": enum("intensity"),
+            "family": enum("family"),
+            "setting": enum("setting"),
+            "caption_zone": enum("caption_zone"),
+            "topics": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 3,
+                "items": enum("topic"),
+            },
+            "text_in_image": {"type": "boolean"},
+            "profanity_in_image": {"type": "boolean"},
+            "safety": enum("safety"),
+        },
+        "required": [
+            "subject", "action", "subject_kind", "subject_plural", "emotion",
+            "intensity", "family", "setting", "caption_zone", "topics",
+            "text_in_image", "profanity_in_image", "safety",
+        ],
+        "additionalProperties": False,
+    }
+
+
 def grammar() -> str:
     """GBNF. An unknown enum value cannot be emitted."""
     fields = [" | ".join(f'"{item}"' for item in values(axis)) for axis in ENUM_AXES]
@@ -138,7 +187,48 @@ def is_refusal(text: str) -> bool:
 
 
 def parse_response(text: str) -> TagPayload:
-    return TagPayload.model_validate(json.loads(text))
+    """Parse the answer. Tolerates a fence and a missing content field.
+
+    The schema-constrained path returns bare JSON, but the chat template may wrap
+    it in ```json fences, and some builds return the object under
+    message.reasoning_content instead of message.content. Neither is a reason to
+    throw away an otherwise valid answer.
+    """
+    body = _extract_json_text(text)
+    return TagPayload.model_validate(json.loads(body))
+
+
+def _extract_json_text(text: str) -> str:
+    body = (text or "").strip()
+    if body.startswith("```"):
+        body = body.split("\n", 1)[-1] if "\n" in body else body
+        if body.rstrip().endswith("```"):
+            body = body.rstrip()[: -3]
+        body = body.strip()
+    if not body and text:
+        # The object may be embedded in a longer string; take the outer braces.
+        start = text.find("{")
+        end = text.rfind("}")
+        if start >= 0 and end > start:
+            body = text[start:end + 1]
+    return body
+
+
+def _message_text(body: dict) -> str:
+    """Pull the answer out of an OpenAI-shaped completion.
+
+    Prefer message.content. Fall back to reasoning_content and to any tool-style
+    field, because a thinking template can leave content empty.
+    """
+    try:
+        message = body["choices"][0]["message"]
+    except (KeyError, IndexError, TypeError):
+        return ""
+    for key in ("content", "reasoning_content", "text"):
+        value = message.get(key)
+        if isinstance(value, str) and value.strip():
+            return value
+    return ""
 
 
 def _conf(body: dict) -> float | None:
@@ -180,27 +270,53 @@ def tag_image(
     """One image. Gate first. Temperature 0, then one retry at 0.2. Never a third call."""
     assert_gate_alive(record_path, model, mmproj)
     url = f"http://{cfg.runtime.host}:{cfg.runtime.port}/v1/chat/completions"
+    # This server only accepts media as a path RELATIVE to --media-path, not an
+    # absolute file:// URI. An absolute URI is rejected with
+    # "file path is not allowed: /C:/...".
+    try:
+        relative = image_path.resolve().relative_to(MEDIA_ROOT.resolve()).as_posix()
+        image_url = f"file://{relative}"
+    except ValueError as exc:
+        raise ValueError(
+            f"image {image_path} is outside the media root {MEDIA_ROOT}"
+        ) from exc
     attempts: list[TagAttempt] = []
     specs = ((0.0, 1), (cfg.runtime.tag_retry_temperature, 2))
     for temperature, seed in specs:
         payload = {
             "temperature": temperature,
             "seed": seed,
-            "grammar": grammar(),
+            # This server applies a schema from response_format, not a bare
+            # "grammar" field. See json_schema() for why.
+            "response_format": {
+                "type": "json_schema",
+                "json_schema": {"name": "tag", "schema": json_schema()},
+            },
+            # Bound the answer explicitly. Without it the server uses whatever
+            # context is left, and a long vision prompt leaves none.
+            "max_tokens": cfg.runtime.tag_max_tokens,
             "messages": [
                 {"role": "user", "content": [
                     {"type": "text", "text": prompt(rubric)},
-                    {"type": "image_url", "image_url": {"url": image_path.as_uri()}},
+                    {"type": "image_url", "image_url": {"url": image_url}},
                 ]}
             ],
         }
         try:
             body = _post(url, payload, cfg.runtime.tag_timeout_s, poster)
-            text = body["choices"][0]["message"]["content"]
+            text = _message_text(body)
             parsed = parse_response(text)
         except Exception as exc:  # noqa: BLE001 — invalid stays untagged after the retry
+            # Keep whatever the model said. An empty raw hides truncation and
+            # grammar mismatches, which is what made this take hours to find.
+            raw = ""
+            try:
+                raw = _message_text(body)[:600]
+            except Exception:
+                pass
             attempts.append(TagAttempt(
-                payload=None, raw="", temperature=temperature, seed=seed, conf=None, error=str(exc),
+                payload=None, raw=raw, temperature=temperature, seed=seed,
+                conf=None, error=str(exc),
             ))
             continue
         attempts.append(TagAttempt(
@@ -208,7 +324,6 @@ def tag_image(
         ))
         return attempts
     return attempts
-
 
 def probe_unconstrained(text: str, *, poster: Callable, url: str) -> str:
     """S-5 probe. No grammar. A refusal fails the model. Does not write tags."""

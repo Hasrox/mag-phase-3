@@ -8,17 +8,23 @@ import unittest
 from pathlib import Path
 
 from mag.gate import check_log
-from mag.gatetest import must_pass_cases, negative_cases
+from mag.gatetest import must_pass_cases, negative_cases, real_log_is_accepted
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 class GateTests(unittest.TestCase):
     def test_log_patterns(self):
-        self.assertEqual(check_log((ROOT / "fixtures/gate_logs/pass.log").read_text(), 64), [])
-        self.assertTrue(check_log((ROOT / "fixtures/gate_logs/no_offload.log").read_text(), 64))
-        self.assertTrue(check_log((ROOT / "fixtures/gate_logs/cpu_kv.log").read_text(), 64))
-        self.assertTrue(check_log((ROOT / "fixtures/gate_logs/no_projector.log").read_text(), 64))
+        """Against the real llama-server strings, not invented ones."""
+        from mag.gatetest import CPU_ONLY_LOG, PASS_LOG
+        from mag.gate import HOST_BUFFER_MAX_MIB
+
+        self.assertEqual(check_log(PASS_LOG, HOST_BUFFER_MAX_MIB), [])
+        self.assertTrue(check_log(CPU_ONLY_LOG), "a CPU-only run must be rejected")
+
+    def test_real_capture_is_accepted(self):
+        name, failures = real_log_is_accepted()
+        self.assertEqual(failures, [], f"{name} was wrongly rejected: {failures}")
 
     def test_python_negatives(self):
         """Every negative case, in Python. Runs on Windows without bash."""
