@@ -1,0 +1,9 @@
+Phase 2 seed lock. Operator local collection. License notes are not a gate.
+
+images: assets/images/  300 jpg
+sounds: assets/sounds/  40 mp3
+gif: 0 in this seed
+
+Import hard limit is 5s. 24 sounds are longer than 5s and will be rejected at import until trimmed. 16 are within the cap.
+
+Phase 3 must render GIF as well as JPEG. Pillow reads frames. No GIF is in this seed.
