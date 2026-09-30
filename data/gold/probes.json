@@ -1,0 +1,22 @@
+[
+  {"id": "p01", "topic": "gaming", "text": "a person screaming at a loading screen"},
+  {"id": "p02", "topic": "gaming", "text": "a controller snapped in half on a desk"},
+  {"id": "p03", "topic": "toilet", "text": "someone staring at a bathroom mirror at 3am"},
+  {"id": "p04", "topic": "toilet", "text": "a cat sitting in a sink"},
+  {"id": "p05", "topic": "everyday", "text": "a person holding a grocery bag that split"},
+  {"id": "p06", "topic": "everyday", "text": "keys dropped in a puddle"},
+  {"id": "p07", "topic": "food", "text": "a burnt piece of toast on a plate"},
+  {"id": "p08", "topic": "food", "text": "someone staring into a microwave"},
+  {"id": "p09", "topic": "work", "text": "a laptop covered in sticky notes"},
+  {"id": "p10", "topic": "work", "text": "an empty meeting room with one chair turned"},
+  {"id": "p11", "topic": "animals", "text": "a dog refusing to walk past a leaf"},
+  {"id": "p12", "topic": "animals", "text": "a bird standing on a keyboard"},
+  {"id": "p13", "topic": "internet", "text": "a phone screen full of unread notifications"},
+  {"id": "p14", "topic": "internet", "text": "a person filming a reaction to nothing"},
+  {"id": "p15", "topic": "relationships", "text": "two mugs, one pushed to the far side of the table"},
+  {"id": "p16", "topic": "relationships", "text": "a text thread left on read"},
+  {"id": "p17", "topic": "gaming", "text": "a victory pose in an empty room"},
+  {"id": "p18", "topic": "work", "text": "a spreadsheet with one cell highlighted"},
+  {"id": "p19", "topic": "food", "text": "a takeout box opened with dread"},
+  {"id": "p20", "topic": "everyday", "text": "an alarm clock face down on the floor"}
+]

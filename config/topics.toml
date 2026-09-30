@@ -1,0 +1,17 @@
+# MAG-PRD-1.1 section 5.2. Operator confirmation blocks Phase 1 exit, not construction.
+# internet and relationships are the proposal. Substitute by editing topics, then set confirmed = true.
+
+confirmed = false
+confirmed_at = ""
+note = "PRD proposal. Phase 1 exit stays open until confirmed = true."
+
+topics = [
+  "gaming",
+  "toilet",
+  "everyday",
+  "food",
+  "work",
+  "animals",
+  "internet",
+  "relationships",
+]

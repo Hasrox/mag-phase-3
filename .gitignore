@@ -4,3 +4,8 @@ runtime/gates/*.json
 runtime/llama.cpp/
 models/*.gguf
 models/*.bin
+data/*.sqlite
+data/*.sqlite-*
+assets/images/
+assets/sounds/
+assets/render_cache/
