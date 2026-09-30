@@ -81,6 +81,8 @@ class SoundCfg(BaseModel):
     model_config = ConfigDict(extra="ignore")
     target_lufs: float
     max_duration_s: float
+    play_cap_s: float = 8.0
+    accept_over_cap: bool = True
     warn_duration_s: float
     lufs_tolerance: float
     onset_db: float
