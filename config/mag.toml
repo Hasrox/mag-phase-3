@@ -29,6 +29,10 @@ image_cooldown_cap = 60
 composition_cooldown = 200
 skip_cooldown_mult = 3
 abandon_minutes = 30
+# Sounds served in the last N impressions are kept out of the prior slots.
+# Until real tags exist every image shares one prior, so the same file would
+# otherwise return on every other draw.
+sound_repeat_window = 8
 
 [ranker]
 alpha = 0.5
@@ -65,13 +69,26 @@ accept_over_cap = true
 warn_duration_s = 2.5
 lufs_tolerance = 1.0
 onset_db = -40.0
+# Operator override 2026-09-30. Loudnorm was added and rejected. Import measures
+# loudness, onset, and duration for reporting only. It never writes
+# assets/sounds/norm and never gates on the measurement. The UI serves the
+# stored original file from assets.path.
+write_normalized_copy = false
 
 [render]
 min_font_px = 18
 max_font_px = 64
 bar_height = 96
 margin = 16
+# font_file is tried first. font_fallbacks are only consulted when it is missing.
+# A font must resolve: the renderer raises RenderRejected rather than silently
+# drawing with ImageFont.load_default(), which ignores the requested size.
 font_file = "assets/fonts/DejaVuSans-Bold.ttf"
+font_fallbacks = [
+  "C:/Windows/Fonts/impact.ttf",
+  "C:/Windows/Fonts/arialbd.ttf",
+  "C:/Windows/Fonts/arial.ttf",
+]
 
 [eval]
 bootstrap_n = 10000

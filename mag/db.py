@@ -49,7 +49,13 @@ CREATE TABLE IF NOT EXISTS sound_info (
     duration_ms INTEGER NOT NULL,
     onset_ms INTEGER,
     loudness_lufs REAL,
+    -- Kept NOT NULL for existing rows. Loudnorm was rejected by the operator on
+    -- 2026-09-30, so this column is written with the ORIGINAL path and is no
+    -- longer read by the play loop. Serve reads assets.path / original_path.
     norm_path TEXT NOT NULL,
+    -- Repo-relative path of the stored original file. Added additively; a
+    -- pre-existing row is back-filled from assets.path by the migration.
+    original_path TEXT,
     warn_long INTEGER NOT NULL DEFAULT 0 CHECK (warn_long IN (0, 1))
 );
 
@@ -239,7 +245,7 @@ WHERE a.kind = 'image'
 
 CREATE VIEW IF NOT EXISTS pool_sounds AS
 SELECT a.id, a.path, a.sha256, a.license_note, s.duration_ms, s.onset_ms,
-       s.loudness_lufs, s.norm_path, s.warn_long
+       s.loudness_lufs, s.original_path, s.warn_long
 FROM assets a
 JOIN sound_info s ON s.asset_id = a.id
 WHERE a.kind = 'sound'
@@ -299,7 +305,62 @@ def connect(path: Path | None = None) -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     conn.execute("PRAGMA journal_mode = WAL")
+    _migrate(conn)
     return conn
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    """Bring an existing store up to SCHEMA_VERSION. Additive and idempotent."""
+    current = int(conn.execute("PRAGMA user_version").fetchone()[0])
+    if current < SCHEMA_VERSION:
+        migrate_original_path(conn)
+
+
+SCHEMA_VERSION = 2
+
+
+def _columns(conn: sqlite3.Connection, table: str) -> set[str]:
+    return {str(row[1]) for row in conn.execute(f"PRAGMA table_info({table})")}
+
+
+def migrate_original_path(conn: sqlite3.Connection) -> dict[str, int]:
+    """Additive, idempotent. Adds sound_info.original_path and back-fills it.
+
+    Loudnorm was rejected by the operator, so the play loop serves the stored
+    original file. The column is added rather than repointing norm_path alone so
+    that the measurement columns keep their meaning and the intent is recorded
+    in the schema. norm_path is repointed to the original as well so it cannot
+    keep pointing at a wav nobody serves any more.
+    """
+    result = {"added_column": 0, "backfilled": 0, "repointed": 0, "dropped_view": 0}
+    if "sound_info" not in {
+        str(row[0]) for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
+    }:
+        return result
+    if "original_path" not in _columns(conn, "sound_info"):
+        conn.execute("ALTER TABLE sound_info ADD COLUMN original_path TEXT")
+        result["added_column"] = 1
+    cur = conn.execute(
+        """UPDATE sound_info
+           SET original_path = (SELECT a.path FROM assets a WHERE a.id = sound_info.asset_id)
+           WHERE original_path IS NULL OR trim(original_path) = ''"""
+    )
+    result["backfilled"] = int(cur.rowcount)
+    cur = conn.execute(
+        """UPDATE sound_info
+           SET norm_path = original_path
+           WHERE original_path IS NOT NULL
+             AND trim(original_path) <> ''
+             AND norm_path <> original_path"""
+    )
+    result["repointed"] = int(cur.rowcount)
+    # The view was created with the old column list. SQLite will not redefine it.
+    conn.execute("DROP VIEW IF EXISTS pool_sounds")
+    result["dropped_view"] = 1
+    _apply_schema(conn)
+    conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
+    conn.commit()
+    return result
 
 
 def _apply_schema(conn: sqlite3.Connection) -> None:

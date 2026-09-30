@@ -12,14 +12,27 @@ from mag.paths import ROOT
 
 
 class RenderRejected(ValueError):
-    """Fit failed at the minimum font size. The candidate is dropped, not repaired."""
+    """Fit failed at the minimum font size, or no font resolved. Dropped, not repaired."""
+
+
+def _font_paths(cfg: RenderCfg) -> list[Path]:
+    """Configured font first, then fallbacks. Absolute paths are used as-is."""
+    paths = [Path(cfg.font_file)]
+    paths += [Path(item) for item in cfg.font_fallbacks]
+    return [path if path.is_absolute() else ROOT / path for path in paths]
 
 
 def _font(cfg: RenderCfg, size: int):
-    path = ROOT / cfg.font_file
-    if path.exists():
-        return ImageFont.truetype(str(path), size=size)
-    return ImageFont.load_default()
+    """Load a truetype font at the requested size.
+
+    load_default() is not a fallback: it ignores size, so every caption would
+    render at one fixed tiny size. A missing font is a configuration error and
+    the candidate is dropped.
+    """
+    for path in _font_paths(cfg):
+        if path.exists():
+            return ImageFont.truetype(str(path), size=size)
+    raise RenderRejected(f"no font resolved; tried {[str(p) for p in _font_paths(cfg)]}")
 
 
 def _fits(draw, text: str, font, width: int, margin: int) -> bool:
@@ -85,7 +98,14 @@ def render_image(src: Path, text: str, layout: str, dest: Path, cfg: RenderCfg) 
     return dest
 
 
-def cache_path(cache_dir: Path, image_sha: str, text: str, layout: str) -> Path:
+def cache_path(
+    cache_dir: Path,
+    image_sha: str,
+    text: str,
+    layout: str,
+    source_suffix: str = ".png",
+) -> Path:
+    """Cache filename keyed by the composition, so a re-render replaces a stale one."""
     digest = hashlib.sha256(f"{image_sha}|{layout}|{text}".encode()).hexdigest()
-    suffix = ".gif" if image_sha.endswith("gif") else ".png"
+    suffix = ".gif" if source_suffix.lower() == ".gif" else ".png"
     return cache_dir / f"{digest}{suffix}"

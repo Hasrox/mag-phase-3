@@ -2,9 +2,16 @@ __pycache__/
 .venv/
 runtime/gates/*.json
 runtime/llama.cpp/
+runtime/llama.cpp-commit.txt
 models/*.gguf
 models/*.bin
 data/*.sqlite
 data/*.sqlite-*
+data/*.sqlite.bak-*
+data/placeholder_tags.json
+data/test_scratch/
+data/report.txt
 assets/render_cache/
 assets/sounds/norm/
+assets/fonts/*.ttf
+tests/__pycache__/

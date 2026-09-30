@@ -148,49 +148,6 @@ def _ffmpeg_json(stderr: str) -> dict:
     return json.loads(stderr[start : end + 1])
 
 
-def _mean_volume_db(path: Path) -> float:
-    proc = subprocess.run(
-        ["ffmpeg", "-i", str(path), "-af", "volumedetect", "-f", "null", "-"],
-        capture_output=True, text=True,
-    )
-    for line in proc.stderr.splitlines():
-        if "mean_volume:" in line:
-            return float(line.split("mean_volume:")[1].split("dB")[0].strip())
-    raise ImportRejected("volumedetect produced no mean_volume")
-
-
-def _normalize(src: Path, dest: Path, target: float, duration_ms: int) -> None:
-    """Two-pass loudnorm at or above 1 s. RMS gain below 1 s. UI serves only dest."""
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    if duration_ms < 1000:
-        mean = _mean_volume_db(src)
-        gain = target - mean
-        subprocess.check_call(
-            ["ffmpeg", "-y", "-i", str(src), "-af", f"volume={gain:.2f}dB", "-ar", "44100", str(dest)],
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-        )
-        return
-    measure = subprocess.run(
-        ["ffmpeg", "-i", str(src), "-af", f"loudnorm=I={target}:TP=-1.5:LRA=11:print_format=json", "-f", "null", "-"],
-        capture_output=True, text=True,
-    )
-    measured = _ffmpeg_json(measure.stderr)
-    if measured.get("input_i") in (None, "-inf", "inf"):
-        raise ImportRejected("sound has no measurable loudness")
-    loudnorm = (
-        f"loudnorm=I={target}:TP=-1.5:LRA=11:"
-        f"measured_I={measured['input_i']}:"
-        f"measured_TP={measured['input_tp']}:"
-        f"measured_LRA={measured['input_lra']}:"
-        f"measured_thresh={measured['input_thresh']}:"
-        f"offset={measured['target_offset']}:linear=true"
-    )
-    subprocess.check_call(
-        ["ffmpeg", "-y", "-i", str(src), "-af", loudnorm, "-ar", "44100", str(dest)],
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-    )
-
-
 def import_sound(
     conn: sqlite3.Connection,
     manifest: dict,
@@ -220,38 +177,44 @@ def import_sound(
     dest.parent.mkdir(parents=True, exist_ok=True)
     if not dest.exists():
         shutil.copy2(src, dest)
-    norm = assets / "sounds" / "norm" / f"{digest}.wav"
+    original = _rel(dest, assets)
+    # Loudnorm was rejected by the operator on 2026-09-30. The file is stored
+    # whole and served as-is. Duration, onset and loudness are measurements for
+    # reporting only; none of them is a gate and none of them re-encodes audio.
+    onset = _onset_ms(dest, cfg.sound.onset_db)
     try:
-        _normalize(dest, norm, cfg.sound.target_lufs, duration_ms)
-        onset = _onset_ms(dest, cfg.sound.onset_db)
-        loudness = _loudness(norm) if duration_ms >= 1000 else _mean_volume_db(norm)
+        loudness = _loudness(dest)
     except Exception:
-        norm.unlink(missing_ok=True)
-        raise
+        loudness = None
     loud_warn = (
-        duration_ms >= 1000
+        loudness is not None
         and abs(loudness - cfg.sound.target_lufs) > cfg.sound.lufs_tolerance
     )
     if loud_warn:
         print(
-            f"warn {src.name}: normalized loudness {loudness:.2f} LUFS is outside "
-            f"{cfg.sound.lufs_tolerance} LU of {cfg.sound.target_lufs}"
+            f"note {src.name}: measured loudness {loudness:.2f} LUFS is outside "
+            f"{cfg.sound.lufs_tolerance} LU of {cfg.sound.target_lufs}. "
+            f"Measurement only; the file is served unaltered."
         )
     cur = conn.execute(
         """INSERT INTO assets(kind, path, sha256, license_note, source, state, is_gold)
            VALUES ('sound', ?, ?, ?, ?, 'active', 0)""",
-        (_rel(dest, assets), digest, note, manifest.get("source", "")),
+        (original, digest, note, manifest.get("source", "")),
     )
     asset_id = int(cur.lastrowid)
     conn.execute(
-        """INSERT INTO sound_info(asset_id, duration_ms, onset_ms, loudness_lufs, norm_path, warn_long)
-           VALUES (?, ?, ?, ?, ?, ?)""",
+        """INSERT INTO sound_info(
+               asset_id, duration_ms, onset_ms, loudness_lufs, norm_path, original_path, warn_long
+           ) VALUES (?, ?, ?, ?, ?, ?, ?)""",
         (
             asset_id,
             duration_ms,
             onset,
             loudness,
-            _rel(norm, assets),
+            # norm_path is legacy and stays NOT NULL. It holds the original path
+            # so it can never point at a wav the play loop stopped serving.
+            original,
+            original,
             int(duration_ms > cfg.sound.warn_duration_s * 1000 or loud_warn),
         ),
     )
@@ -383,11 +346,14 @@ def import_gold(
 
 
 def ensure_layout(root: Path) -> None:
-    """Section 5.1. Quarantine exists and is invisible to import."""
+    """Section 5.1. Quarantine exists and is invisible to import.
+
+    assets/sounds/norm is deliberately absent: loudnorm was rejected by the
+    operator, so import never writes a derived audio copy.
+    """
     for rel in (
         "assets/images",
         "assets/sounds",
-        "assets/sounds/norm",
         "assets/fonts",
         "assets/render_cache",
         "assets/quarantine",

@@ -1,0 +1,446 @@
+[
+  {
+    "axis": "topic",
+    "value": "gaming",
+    "description": "Content domain.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "topic",
+    "value": "toilet",
+    "description": "Content domain.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "topic",
+    "value": "everyday",
+    "description": "Content domain.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "topic",
+    "value": "food",
+    "description": "Content domain.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "topic",
+    "value": "work",
+    "description": "Content domain.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "topic",
+    "value": "animals",
+    "description": "Content domain.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "topic",
+    "value": "internet",
+    "description": "Content domain. Operator may substitute.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "topic",
+    "value": "relationships",
+    "description": "Content domain. Operator may substitute.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "emotion",
+    "value": "deadpan",
+    "description": "Affect of the main subject.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "emotion",
+    "value": "angry",
+    "description": "Affect of the main subject.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "emotion",
+    "value": "smug",
+    "description": "Affect of the main subject.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "emotion",
+    "value": "crying",
+    "description": "Affect of the main subject.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "emotion",
+    "value": "shocked",
+    "description": "Affect of the main subject.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "emotion",
+    "value": "none",
+    "description": "Affect of the main subject.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "intensity",
+    "value": "low",
+    "description": "Energy of the image, or loudness class of the sound.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "intensity",
+    "value": "mid",
+    "description": "Energy of the image, or loudness class of the sound.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "intensity",
+    "value": "high",
+    "description": "Energy of the image, or loudness class of the sound.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "family",
+    "value": "reaction",
+    "description": "Layout the image supports.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "family",
+    "value": "object_label",
+    "description": "Layout the image supports.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "family",
+    "value": "comparison",
+    "description": "Layout the image supports.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "family",
+    "value": "sign",
+    "description": "Layout the image supports.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "family",
+    "value": "other",
+    "description": "Layout the image supports.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "setting",
+    "value": "indoor",
+    "description": "Template legality only. Not a feature.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "setting",
+    "value": "outdoor",
+    "description": "Template legality only. Not a feature.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "setting",
+    "value": "screen",
+    "description": "Template legality only. Not a feature.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "setting",
+    "value": "abstract",
+    "description": "Template legality only. Not a feature.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "setting",
+    "value": "unknown",
+    "description": "Template legality only. Not a feature.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "subject_kind",
+    "value": "person",
+    "description": "Agreement and pronouns in slots.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "subject_kind",
+    "value": "animal",
+    "description": "Agreement and pronouns in slots.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "subject_kind",
+    "value": "object",
+    "description": "Agreement and pronouns in slots.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "subject_kind",
+    "value": "character",
+    "description": "Agreement and pronouns in slots.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "subject_kind",
+    "value": "group",
+    "description": "Agreement and pronouns in slots.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "caption_zone",
+    "value": "top",
+    "description": "Free area for impact-style text.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "caption_zone",
+    "value": "bottom",
+    "description": "Free area for impact-style text.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "caption_zone",
+    "value": "both",
+    "description": "Free area for impact-style text.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "caption_zone",
+    "value": "none",
+    "description": "Free area for impact-style text.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "safety",
+    "value": "ok",
+    "description": "May enter the pool.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "safety",
+    "value": "review",
+    "description": "Held until the operator resolves it.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "safety",
+    "value": "reject",
+    "description": "Never served.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "sound_class",
+    "value": "sting",
+    "description": "Short musical punctuation.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "sound_class",
+    "value": "trombone",
+    "description": "Fail sting.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "sound_class",
+    "value": "scratch",
+    "description": "Record scratch.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "sound_class",
+    "value": "gasp",
+    "description": "Intake of breath.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "sound_class",
+    "value": "boom",
+    "description": "Impact.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "sound_class",
+    "value": "other",
+    "description": "Anything else with a file.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "sound_class",
+    "value": "silence",
+    "description": "Virtual. No file. Candidate for every caption.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "fit_emotion",
+    "value": "deadpan",
+    "description": "Emotion this sound suits. Operator-set.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "fit_emotion",
+    "value": "angry",
+    "description": "Emotion this sound suits. Operator-set.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "fit_emotion",
+    "value": "smug",
+    "description": "Emotion this sound suits. Operator-set.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "fit_emotion",
+    "value": "crying",
+    "description": "Emotion this sound suits. Operator-set.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "fit_emotion",
+    "value": "shocked",
+    "description": "Emotion this sound suits. Operator-set.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "fit_emotion",
+    "value": "none",
+    "description": "Emotion this sound suits. Operator-set.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "mechanism",
+    "value": "label",
+    "description": "How the joke works.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "mechanism",
+    "value": "contrast",
+    "description": "How the joke works.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "mechanism",
+    "value": "understatement",
+    "description": "How the joke works.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "mechanism",
+    "value": "escalation",
+    "description": "How the joke works.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "mechanism",
+    "value": "relatable",
+    "description": "How the joke works.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "mechanism",
+    "value": "absurd",
+    "description": "How the joke works.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "mechanism",
+    "value": "self_own",
+    "description": "How the joke works.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "mechanism",
+    "value": "pov",
+    "description": "How the joke works.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "mechanism",
+    "value": "anti_joke",
+    "description": "How the joke works.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "voice",
+    "value": "first_person",
+    "description": "Who is speaking.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "voice",
+    "value": "second_person",
+    "description": "Who is speaking.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "voice",
+    "value": "third_person",
+    "description": "Who is speaking.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "voice",
+    "value": "imperative",
+    "description": "Who is speaking.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "register",
+    "value": "dry",
+    "description": "Tone of delivery.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "register",
+    "value": "chaotic",
+    "description": "Tone of delivery.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "register",
+    "value": "sincere",
+    "description": "Tone of delivery.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "register",
+    "value": "mock_formal",
+    "description": "Tone of delivery.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "structure",
+    "value": "single_line",
+    "description": "Shape of the text.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "structure",
+    "value": "two_part",
+    "description": "Shape of the text.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "structure",
+    "value": "label_pair",
+    "description": "Shape of the text.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "structure",
+    "value": "top_bottom",
+    "description": "Shape of the text.",
+    "since_version": "1.1"
+  },
+  {
+    "axis": "structure",
+    "value": "nobody_me",
+    "description": "Shape of the text.",
+    "since_version": "1.1"
+  }
+]

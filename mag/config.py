@@ -43,6 +43,9 @@ class Pool(BaseModel):
     composition_cooldown: int
     skip_cooldown_mult: int
     abandon_minutes: int
+    # How many recent impressions keep a sound out of the prior slots. Placeholder
+    # tags give every image one prior, so without this the same file wins often.
+    sound_repeat_window: int = 8
 
 
 class RankerCfg(BaseModel):
@@ -86,6 +89,9 @@ class SoundCfg(BaseModel):
     warn_duration_s: float
     lufs_tolerance: float
     onset_db: float
+    # Operator override 2026-09-30: loudnorm is not wanted. Import measures, it
+    # does not re-encode. Kept so an older config without the key still loads.
+    write_normalized_copy: bool = False
 
 
 class RenderCfg(BaseModel):
@@ -95,6 +101,8 @@ class RenderCfg(BaseModel):
     bar_height: int
     margin: int
     font_file: str
+    # Tried in order when font_file does not resolve. A font must resolve.
+    font_fallbacks: list[str] = []
 
 
 class EvalCfg(BaseModel):

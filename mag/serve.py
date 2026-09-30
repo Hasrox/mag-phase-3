@@ -27,7 +27,7 @@ from mag.config import Config
 from mag.db import live_tags
 from mag.features import TIERS, build_features
 from mag.paths import RENDER_CACHE, ROOT
-from mag.render import RenderRejected, render_image
+from mag.render import RenderRejected, cache_path, render_image
 
 POLICIES = ("coverage", "bandit", "holdout")
 FLAG_KINDS = (
@@ -316,15 +316,45 @@ def _upsert_composition(conn: sqlite3.Connection, image_id: int, caption_id: int
 
 
 def _sound_path(conn: sqlite3.Connection, sound_id: int | None) -> str:
+    """The stored original file. assets.path is the single source of truth.
+
+    This used to read sound_info.norm_path, which pointed at the loudnorm wav
+    under assets/sounds/norm. Loudnorm was rejected by the operator on
+    2026-09-30, so the play loop serves the original file and never a derived
+    copy. Silence (sound_id None) returns "", which is a legal draw, not a
+    missing file.
+    """
     if sound_id is None:
         return ""
     row = conn.execute(
-        "SELECT norm_path FROM sound_info WHERE asset_id = ?", (sound_id,)
+        "SELECT path FROM assets WHERE id = ? AND kind = 'sound'", (sound_id,)
     ).fetchone()
-    if not row or not row["norm_path"]:
+    if not row or not row["path"]:
         return ""
-    path = Path(row["norm_path"])
+    path = Path(row["path"])
     return str(path if path.is_absolute() else ROOT / path)
+
+
+def _sound_file_exists(conn: sqlite3.Connection, sound_id: int | None) -> bool:
+    """False for silence (a legal candidate) and for a file that is gone."""
+    if sound_id is None:
+        return True
+    path = _sound_path(conn, sound_id)
+    return bool(path) and Path(path).is_file()
+
+
+def recent_sound_ids(recent: list[sqlite3.Row], limit: int = 8) -> list[int]:
+    """Sound ids from the last `limit` impressions, oldest first.
+
+    mag.composer.sound_candidates can already exclude these from its prior
+    slots, but mag/serve.py never passed them. Placeholder tags give every image
+    the same prior, so without this the same file won every other draw.
+    """
+    ids: list[int] = []
+    for row in list(recent)[-limit:] if limit > 0 else []:
+        if row["sound_id"]:
+            ids.append(int(row["sound_id"]))
+    return ids
 
 
 def candidates_for(
@@ -342,6 +372,10 @@ def candidates_for(
     recent = _recent(conn, profile_id)
     previous_template = int(recent[-1]["template_id"]) if recent and recent[-1]["template_id"] else None
     previous_sound = int(recent[-1]["sound_id"]) if recent and recent[-1]["sound_id"] else None
+    # Placeholder tags give every image the same prior, so the last eight served
+    # sounds are kept out of the prior slots. Both halves are required: the
+    # composer half landed in 6130a65, this call site is what makes it apply.
+    recent_sounds = recent_sound_ids(recent, cfg.pool.sound_repeat_window)
     k = cooldown_k(len(raw), cfg.pool.image_cooldown_cap)
     templates = load_templates(conn)
     wordlist = load_wordlist()
@@ -369,8 +403,13 @@ def candidates_for(
             sounds = sound_candidates(
                 conn, tags, caption.style, rng, cfg,
                 previous_sound=previous_sound, blocked_sounds=blocked_snd,
+                recent_sounds=recent_sounds,
             )
             for sound in sounds:
+                # A row whose file is gone is a broken asset, not silence. Silence
+                # has sound_id None and is always kept.
+                if not _sound_file_exists(conn, sound.sound_id):
+                    continue
                 found.append({
                     "image": image,
                     "tags": tags,
@@ -460,20 +499,23 @@ def score_and_pick(
     src = Path(image["path"])
     src = src if src.is_absolute() else ROOT / src
     cache = cache_dir or RENDER_CACHE
-    suffix = ".gif" if src.suffix.lower() == ".gif" else ".png"
-    dest = cache / f"{seed}{suffix}"
-    try:
-        render_image(src, caption.text, caption.render, dest, cfg.render)
-    except RenderRejected as exc:
-        conn.execute(
-            "INSERT INTO render_rejects(session_id, image_id, template_id, reason) VALUES (?, ?, ?, ?)",
-            (session_id, int(image["id"]), caption.template_id, str(exc)),
-        )
-        conn.commit()
-        return ServeResult(
-            None, policy, int(image["id"]), caption.template_id, sound.sound_id,
-            caption.text, "", "", raw_pool, len(candidates), "render rejected",
-        )
+    # Keyed by the composition, not the RNG seed. The seed changes every serve,
+    # so a seed-keyed cache never reuses a file and never replaces a stale one.
+    dest = cache_path(cache, str(image["sha256"]), caption.text, caption.render, src.suffix)
+    if not dest.exists():
+        try:
+            render_image(src, caption.text, caption.render, dest, cfg.render)
+        except RenderRejected as exc:
+            dest.unlink(missing_ok=True)
+            conn.execute(
+                "INSERT INTO render_rejects(session_id, image_id, template_id, reason) VALUES (?, ?, ?, ?)",
+                (session_id, int(image["id"]), caption.template_id, str(exc)),
+            )
+            conn.commit()
+            return ServeResult(
+                None, policy, int(image["id"]), caption.template_id, sound.sound_id,
+                caption.text, "", "", raw_pool, len(candidates), "render rejected",
+            )
     caption_id = _upsert_caption(conn, int(image["id"]), caption)
     composition_id = _upsert_composition(conn, int(image["id"]), caption_id, sound.sound_id)
     if _composition_cooling(recent, composition_id, cfg.pool.composition_cooldown):
