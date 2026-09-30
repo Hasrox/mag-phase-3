@@ -8,6 +8,7 @@ already in the store is left alone, including its tags.
 from __future__ import annotations
 
 import hashlib
+import shutil
 import sqlite3
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -87,6 +88,16 @@ def _image_row(path: Path) -> dict:
     }
 
 
+def _ffmpeg_missing() -> str:
+    missing = [name for name in ("ffmpeg", "ffprobe") if shutil.which(name) is None]
+    if not missing:
+        return ""
+    return (
+        "ffmpeg/ffprobe not on PATH (" + ", ".join(missing) + "). "
+        "Sounds were not imported. Install ffmpeg, reopen the terminal, relaunch."
+    )
+
+
 def absorb(conn: sqlite3.Connection, cfg: Config, assets: Path | None = None) -> AbsorbResult:
     """Import new images, GIFs, and sounds. Does not retag files already stored."""
     root = assets or ASSETS
@@ -94,6 +105,9 @@ def absorb(conn: sqlite3.Connection, cfg: Config, assets: Path | None = None) ->
     result = AbsorbResult()
     if not root.exists():
         return result
+    sound_block = _ffmpeg_missing()
+    if sound_block:
+        result.rejected.append(sound_block)
     for path in sorted(root.rglob("*")):
         if not path.is_file() or _skip(path):
             continue
@@ -107,6 +121,8 @@ def absorb(conn: sqlite3.Connection, cfg: Config, assets: Path | None = None) ->
             continue
         if _known(conn, digest):
             result.skipped += 1
+            continue
+        if suffix in SOUND_EXT and sound_block:
             continue
         try:
             if suffix in IMAGE_EXT:
