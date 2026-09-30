@@ -47,6 +47,8 @@ from mag.ui import _sound_note  # noqa: E402
 IMAGES = 25
 SOUNDS = 6
 NOTE = "operator fixture"
+# score_and_pick draws from random.Random(profile.rng_seed + profile_id).
+SEED = 4242
 # This store must BE the MAG_ROOT: mag.serve resolves assets.path against
 # mag.paths.ROOT, so a nested directory would resolve to the wrong place.
 SCRATCH = _scratch_root.mag_root()
@@ -128,6 +130,12 @@ class Phase4Tests(unittest.TestCase):
         cls.cache = SCRATCH / "assets" / "render_cache"
         cls.cache.mkdir(parents=True, exist_ok=True)
         cls.profile_id, cls.session_id = _session(cls.conn, cls.cfg)
+        # active_profile seeds from SystemRandom, so without this the draw
+        # differs every run and the repeat assertions become flaky. Pin it.
+        cls.conn.execute(
+            "UPDATE profiles SET rng_seed = ? WHERE id = ?", (SEED, cls.profile_id)
+        )
+        cls.conn.commit()
 
     @classmethod
     def tearDownClass(cls) -> None:
@@ -143,7 +151,6 @@ class Phase4Tests(unittest.TestCase):
             if result.impression_id is not None:
                 served.append(result.sound_id)
         return served
-
     def test_serves_the_original_file_not_a_normalized_copy(self) -> None:
         rows = self.conn.execute(
             """SELECT a.id, a.path, s.original_path
@@ -194,11 +201,24 @@ class Phase4Tests(unittest.TestCase):
         )
         self.assertEqual(recent_sound_ids([], 8), [])
 
+    def _serve_one(self):
+        """One successful serve, retrying a composition-cooldown drop.
+
+        A cooldown collision returns impression_id None rather than re-picking,
+        so with a pinned seed a single draw can collide. That is a serve-path
+        behaviour, not what this test is about.
+        """
+        for _ in range(20):
+            result = score_and_pick(
+                self.conn, self.cfg, topic=None, profile_id=self.profile_id,
+                session_id=self.session_id, cache_dir=self.cache,
+            )
+            if result.impression_id is not None:
+                return result
+        self.fail("no serve succeeded in 20 attempts")
+
     def test_render_is_cached_by_composition(self) -> None:
-        result = score_and_pick(
-            self.conn, self.cfg, topic=None, profile_id=self.profile_id,
-            session_id=self.session_id, cache_dir=self.cache,
-        )
+        result = self._serve_one()
         self.assertIsNotNone(result.impression_id, result.reason)
         self.assertTrue(result.render_path.endswith(".png"), result.render_path)
         row = self.conn.execute(
@@ -212,7 +232,7 @@ class Phase4Tests(unittest.TestCase):
         expected = cache_path(self.cache, row["sha256"], row["text"], row["render"])
         self.assertEqual(Path(result.render_path).name, expected.name)
         stamp = expected.stat().st_mtime_ns
-        self._serve(1)
+        self._serve_one()
         self.assertEqual(expected.stat().st_mtime_ns, stamp, "cache entry was rewritten")
 
     def test_status_line_does_not_leak_policy(self) -> None:
@@ -232,7 +252,7 @@ class Phase4Tests(unittest.TestCase):
             )[2]
         before = pool()
         # Serve here rather than relying on another test having run first.
-        self._serve(1)
+        self._serve_one()
         image_id = int(self.conn.execute(
             "SELECT image_id FROM impressions WHERE image_id IS NOT NULL ORDER BY id DESC LIMIT 1"
         ).fetchone()[0])

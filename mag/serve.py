@@ -446,8 +446,14 @@ def score_and_pick(
     """Insert the impression at serve time. Phase 5 replaces pick_candidate's body."""
     started = time.perf_counter()
     profile = conn.execute("SELECT * FROM profiles WHERE id = ?", (profile_id,)).fetchone()
-    rng = rng or random.Random(int(profile["rng_seed"]) + int(profile_id))
     recent = _recent(conn, profile_id)
+    # Seeding only from the profile gives the same stream on every call, so the
+    # draw never advances and the same candidate is chosen until a cooldown
+    # removes it. Fold in the impression count so each serve advances the
+    # sequence. An explicit rng, which tests and Phase 5 pass, is respected.
+    rng = rng or random.Random(
+        int(profile["rng_seed"]) + int(profile_id) + len(recent) * 1_000_003
+    )
     policy, block_id, block_pos = _policy_for(recent, int(profile["rng_seed"]), cfg.ranker.block_size)
     candidates, eligible, raw_pool, reason = candidates_for(
         conn, cfg, topic=topic, profile_id=profile_id, rng=rng,
