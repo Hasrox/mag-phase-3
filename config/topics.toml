@@ -1,9 +1,9 @@
-# MAG-PRD-1.1 section 5.2. Operator confirmation blocks Phase 1 exit, not construction.
-# internet and relationships are the proposal. Substitute by editing topics, then set confirmed = true.
+# MAG-PRD-1.1 section 5.2. Operator locked the proposal.
+# internet and relationships stay. Substitute later by editing topics.
 
-confirmed = false
-confirmed_at = ""
-note = "PRD proposal. Phase 1 exit stays open until confirmed = true."
+confirmed = true
+confirmed_at = "2026-09-30"
+note = "Operator locked the PRD proposal. Local collection. No license gate."
 
 topics = [
   "gaming",
