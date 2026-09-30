@@ -19,6 +19,15 @@ store's sha256. The loudnorm wav was the only path that resolved, which is why
 fixing the serve path alone did not change what you heard.
 `scripts/repair_sound_paths.py` repoints the rows; it has been run.
 
+**The draw was pinned to one candidate.** `score_and_pick` built
+`random.Random(profile.rng_seed + profile_id)` on every call, so with no explicit
+rng the stream never advanced and the same candidate was drawn over and over
+until a cooldown removed it. The candidate list shrank as `recent_sounds` and
+image cooldowns grew, which is why the operator saw different images but the same
+sound: the sound came from the top prior slot, and placeholder tags make that
+slot identical for every image. Three separate defects stacked on top of each
+other here. The impression count is now folded into the seed.
+
 **Captions were not model output.** `mag/inbox.py` writes placeholder tags with
 `source='human'` so a dropped file enters the pool. Both `importing._write_tag`
 and `promote._write_model` refuse to overwrite a live human tag, and
@@ -32,6 +41,17 @@ is 0.
 at one fixed tiny size. It now resolves `font_file` then `font_fallbacks` and
 raises if neither exists. The render cache is keyed by composition hash rather
 than the per-serve RNG seed, so stale files are replaced instead of accumulating.
+
+## Tests
+
+```powershell
+python -m unittest discover -s tests
+```
+
+26 tests, one skipped (the bash-only shell gate test, which has no `bash` on
+PATH on Windows; the same negatives run in Python via `mag.gatetest`). The
+Phase 4 tests pin `profiles.rng_seed`, because `active_profile` seeds from
+`SystemRandom` and an unpinned draw makes the repeat assertions flaky.
 
 ## Rules that are not negotiable
 
