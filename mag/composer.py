@@ -99,6 +99,7 @@ def validate_caption(text, *, max_chars, max_lines, profanity_in_image, wordlist
 
 
 def legal(requires: dict, tags: dict[str, list[str]], style: dict[str, str]) -> bool:
+    del style
     for axis, allowed in requires.items():
         if not allowed:
             continue
@@ -129,7 +130,9 @@ def load_templates(conn: sqlite3.Connection) -> list[dict]:
     ).fetchall()
     out = []
     for row in rows:
-        tags = conn.execute("SELECT axis, value FROM template_tags WHERE template_id = ?", (row["id"],)).fetchall()
+        tags = conn.execute(
+            "SELECT axis, value FROM template_tags WHERE template_id = ?", (row["id"],)
+        ).fetchall()
         style = {item["axis"]: item["value"] for item in tags}
         out.append({
             "id": int(row["id"]),
@@ -198,10 +201,19 @@ def _tags(conn, asset_id: int) -> dict[str, list[str]]:
     return out
 
 
-def sound_candidates(conn, image_tags, style, rng, cfg, *, previous_sound=None, blocked_sounds=None):
-    """Top 2 by prior, 1 explore, and silence. Silence is exempt from the consecutive rule."""
+def sound_candidates(conn, image_tags, style, rng, cfg, *, previous_sound=None, blocked_sounds=None, recent_sounds=None):
+    """Top 2 by prior, 1 explore, and silence. Silence is exempt from the consecutive rule.
+
+    Placeholder tags make every image share one prior, so the last 8 sounds are
+    kept out of the prior slots. Otherwise the same file returns every other draw.
+    """
     blocked = blocked_sounds or set()
-    priors = conn.execute("SELECT feature_a, feature_b, mean FROM pair_priors WHERE active = 1").fetchall()
+    recent = set(recent_sounds or [])
+    if previous_sound:
+        recent.add(previous_sound)
+    priors = conn.execute(
+        "SELECT feature_a, feature_b, mean FROM pair_priors WHERE active = 1"
+    ).fetchall()
     sounds = conn.execute(
         """SELECT a.id, s.duration_ms FROM assets a JOIN sound_info s ON s.asset_id = a.id
            WHERE a.kind = 'sound' AND a.state = 'active' AND a.is_gold = 0"""
@@ -211,24 +223,41 @@ def sound_candidates(conn, image_tags, style, rng, cfg, *, previous_sound=None, 
         if int(row["id"]) in blocked:
             continue
         sound_class = _one(_tags(conn, int(row["id"])), "sound_class") or "other"
-        scored.append((int(row["id"]), sound_class, int(row["duration_ms"]), _prior_score(priors, image_tags, style, sound_class)))
+        scored.append((
+            int(row["id"]), sound_class, int(row["duration_ms"]),
+            _prior_score(priors, image_tags, style, sound_class),
+        ))
     scored.sort(key=lambda item: (-item[3], item[0]))
     chosen = []
-    for sound_id, sound_class, duration_ms, prior in scored[:2]:
-        if sound_id == previous_sound:
-            continue
-        chosen.append(SoundPick(sound_id, sound_class, "prior", prior, play_window(duration_ms / 1000, cfg.sound)[1]))
-    rest = [item for item in scored[2:] if item[0] != previous_sound and item[0] not in {pick.sound_id for pick in chosen}]
+    pool = [item for item in scored if item[0] not in recent] or [
+        item for item in scored if item[0] != previous_sound
+    ]
+    for sound_id, sound_class, duration_ms, prior in pool[:2]:
+        chosen.append(SoundPick(
+            sound_id, sound_class, "prior", prior,
+            play_window(duration_ms / 1000, cfg.sound)[1],
+        ))
+    rest = [
+        item for item in pool[2:]
+        if item[0] not in {pick.sound_id for pick in chosen}
+    ]
     if rest:
         sound_id, sound_class, duration_ms, prior = rng.choice(rest)
-        chosen.append(SoundPick(sound_id, sound_class, "explore", prior, play_window(duration_ms / 1000, cfg.sound)[1]))
-    chosen.append(SoundPick(None, "silence", "silence", _prior_score(priors, image_tags, style, "silence"), 0.0))
+        chosen.append(SoundPick(
+            sound_id, sound_class, "explore", prior,
+            play_window(duration_ms / 1000, cfg.sound)[1],
+        ))
+    chosen.append(SoundPick(
+        None, "silence", "silence",
+        _prior_score(priors, image_tags, style, "silence"), 0.0,
+    ))
     return chosen
 
 
 def blocked_pairs(conn, image_id: int) -> set[int]:
     rows = conn.execute(
-        "SELECT b_id FROM flags WHERE a_id = ? AND resolved_at IS NULL AND b_id IS NOT NULL", (image_id,)
+        "SELECT b_id FROM flags WHERE a_id = ? AND resolved_at IS NULL AND b_id IS NOT NULL",
+        (image_id,),
     ).fetchall()
     return {int(row["b_id"]) for row in rows}
 
