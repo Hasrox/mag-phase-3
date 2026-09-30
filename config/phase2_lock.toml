@@ -12,3 +12,15 @@ model_gate_claimed = false
 s4_claimed = false
 s5_claimed = false
 phase3 = "skeleton. Debug entry only. Renderer must accept GIF."
+
+# State as of 2026-09-30, recorded honestly rather than optimistically.
+model_files_moved = true          # GGUF and mmproj are in models/
+gate_passed = false               # llama.cpp is not built; no gate has run
+s4_claimed = false                # the 40-image gold set has no hand labels
+s5_claimed = false
+run_accepted = false              # tag_runs is empty
+active_images_with_model_tags = 0
+gold_images_labelled = 0
+note2 = "models/ holds the Q6_K weights and the Q8_0 mmproj. Nothing has been
+  tagged: llama.cpp CUDA is not built, the gate has not run, and the gold set
+  is unlabelled. Phase 2 exit is open on all three."

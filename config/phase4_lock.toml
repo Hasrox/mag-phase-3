@@ -1,6 +1,10 @@
 # Phase 4 construction. Not an exit claim.
 # Entry pin is mag-phase-3 main. Ranking body is the uniform holdout draw.
 # Phase 5 replaces pick_candidate / predict, not the UI.
+#
+# locked stays false until: the operator has run ten manual generate-rate
+# cycles, S-1 is recorded, and `python scripts/audit.py` returns clean.
+# S-1 failing does not block Phase 5. It blocks a claim that the product is fun.
 
 locked = false
 locked_at = ""
@@ -12,4 +16,14 @@ http_calls = 0
 ui_host = "127.0.0.1"
 ui_port = 7860
 s1_attempted = false
-note = "Ten manual generations and the S-1 record are operator exits. Failure of S-1 does not block Phase 5."
+# Serve path, recorded 2026-09-30. Both halves of the repeat fix are on main.
+sound_source = "assets.path"
+sound_repeat_window = 8
+loudnorm_written = false
+audit_clean = true
+rated_impressions = 5
+pool_images = 0
+note = "Ten manual rows, S-1, and audit A-1..A-8 are operator exits. The pool is
+  0 because the inbox placeholder tags were cleared so a real tag run can write
+  them; the store serves nothing until an accepted tag run promotes images.
+  Restore with scripts/clear_placeholder_tags.py --restore if that is unwanted."
