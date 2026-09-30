@@ -1,0 +1,79 @@
+# MAG-PRD-1.1 hyperparameters. Hash of this file is written on every impression.
+# Changing a value does not reset a profile; a differing hash forces a rebuild
+# from the log (section 6.6). Do not rename an existing feature.
+
+[meta]
+spec = "MAG-PRD-1.1"
+version = "1.1"
+
+[runtime]
+host = "127.0.0.1"
+port = 8080
+ctx_size = 4096
+n_gpu_layers = "all"
+parallel = 1
+min_decode_tps = 15.0
+min_vram_gb = 16.0
+host_buffer_max_mib = 64.0
+memory_delta_ratio = 0.9
+image_long_side = 1024
+tag_timeout_s = 60
+tag_retry_temperature = 0.2
+tag_conf_min = 0.5
+prompt_version = "1.1.0"
+
+[pool]
+min_images = 20
+min_compositions = 60
+image_cooldown_cap = 60
+composition_cooldown = 200
+skip_cooldown_mult = 3
+abandon_minutes = 30
+
+[ranker]
+alpha = 0.5
+sd_r_init = 0.28
+block_size = 5
+coverage_rated = 25
+explore_window = 20
+explore_cap = 0.20
+refactor_every = 200
+skip_train_value = 0.25
+skip_train_weight = 0.5
+lambda_bias = 0.1
+lambda_a = 1.0
+lambda_b = 4.0
+lambda_c = 3.0
+sound_top_priors = 2
+sound_explore = 1
+prior_strength = 2.0
+
+[reward]
+star_1 = 0.00
+star_2 = 0.25
+star_3 = 0.50
+star_4 = 0.75
+star_5 = 1.00
+
+[sound]
+target_lufs = -16.0
+max_duration_s = 5.0
+warn_duration_s = 2.5
+lufs_tolerance = 1.0
+onset_db = -40.0
+
+[render]
+min_font_px = 18
+max_font_px = 64
+bar_height = 96
+margin = 16
+font_file = "assets/fonts/DejaVuSans-Bold.ttf"
+
+[eval]
+bootstrap_n = 10000
+bootstrap_seed = 1103
+s2_min_n = 100
+s2_min_holdout = 20
+s2_min_delta = 0.05
+sim_noise_sd = 0.15
+null_noise_sd = 0.28

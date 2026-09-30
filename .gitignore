@@ -1,0 +1,6 @@
+__pycache__/
+.venv/
+runtime/gates/*.json
+runtime/llama.cpp/
+models/*.gguf
+models/*.bin

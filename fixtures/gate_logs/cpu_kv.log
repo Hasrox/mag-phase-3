@@ -1,0 +1,5 @@
+load_tensors: offloaded 32/32 layers to GPU
+llama_kv_cache: CPU KV buffer size = 256.00 MiB
+clip_model_load: mmproj using CUDA0 backend
+health ok
+probe json ok
