@@ -1,12 +1,22 @@
-MAG model card — operator input, blocks Phase 2 only
+# MAG model card — operator input, blocks Phase 2 only
 
-name:
-source:
-license:
-quant:
-parameter_count:
-mmproj:
-llama_cpp_commit:
+name: gemma-4-12B-it-uncensored-heretic (Q6_K)
+source: https://huggingface.co/mradermacher/gemma-4-12B-it-uncensored-heretic-GGUF
+license: apache-2.0 (base model card: llmfan46/gemma-4-12B-it-uncensored-heretic)
+quant: Q6_K
+parameter_count: 12B total, multimodal
+mmproj: gemma-4-12B-it-uncensored-heretic.mmproj-Q8_0.gguf
+llama_cpp_commit: (filled by scripts/build_llama.ps1)
+
+# Operator note, 2026-09-30.
+# The GGUF and the mmproj were downloaded to C:\Users\Hasan\Downloads and are
+# copied into models/ so the tagger can find them. models/*.gguf is gitignored.
+# The mmproj is the projector: it is what makes the model multimodal, and the
+# gate refuses a run where the projector is not on CUDA.
+#
+# The license above is what the distribution card claims. The operator must
+# confirm they can stand behind it before the first tag run. This line is not a
+# gate: collection is local.
 
 Gold thresholds, fixed before the first tag run (section 5.3):
   emotion accuracy                         >= 0.70
@@ -18,7 +28,10 @@ Gold thresholds, fixed before the first tag run (section 5.3):
   safety false-reject on gold ok           <= 0.10
   determinism, second gold run             >= 0.95 of fields
 
-S-4 passed:
-S-5 passed:
-S-2 verdict:
-notes:
+S-4 passed: (blank until scripts/score_gold.py records it)
+S-5 passed: (blank until scripts/score_gold.py records it)
+S-2 verdict: (Phase 6; not this card)
+notes: Model files present but the GPU gate has not been run. No tag run has
+  been accepted. The 40-image gold set does not exist yet, so S-4 cannot be
+  scored. Active images currently carry inbox placeholder tags, not model tags.
+
