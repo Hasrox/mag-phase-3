@@ -1,0 +1,14 @@
+# Operator lock. Phase 3 construction is finished.
+# Ranking is out of this phase. Order of the dry run is arbitrary.
+
+locked = true
+locked_at = "2026-09-30"
+templates = 28
+priors = 16
+coverage_met = true
+dry_run_pinned = 20
+dry_run_open = 20
+http_calls = 0
+gif_frames = true
+play_cap_s = 8.0
+note = "Fixture dry run passed. Seed image bytes are not in git. Font is local DejaVu. Import accepts over-cap sounds."
